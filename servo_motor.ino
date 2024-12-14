@@ -1,8 +1,10 @@
+
+// Code for Servo motor, PIR sensor and LED
+// Servo motor moves when motion is deteced by PIR sensor
+
 #include <Servo.h>  
 
-
-Servo Servo1;                 // Instance of Servo class
-
+Servo Servo1;   
 
 int servoPin = 10;             // Servo motor pin
 int ledPin = 8;                // LED pin
@@ -16,11 +18,6 @@ int pirVal;                    // the current value of the PIR sensor
 unsigned long myTime;          // number of milliseconds passed since the Arduino started running the code itself
 #define MINUTE 60000           // for converting milliseconds to a minute
 #define SECOND 1000            // for converting milliseconds to a second
-#define SERVO_DELAY 2000       // servo delay of 2 seconds
-#define SENSE_COOLDOWN 5000    // cooldown between senses (5 seconds)
-
-
-unsigned long lastSenseTime = -SENSE_COOLDOWN; // set to allow immediate first activation
 char printBuffer[128];         // messages that we want to display on serial monitor
 
 
@@ -34,11 +31,9 @@ void setup() {
 
 void loop() {
   pirVal = digitalRead(pirPin); // read current input value from PIR sensor (HIGH or LOW)
-  unsigned long currentTime = millis();
 
 
-  // Check if motion is detected and cooldown period has passed
-  if (pirVal == HIGH && (currentTime - lastSenseTime >= SENSE_COOLDOWN)) {
+  if (pirVal == HIGH) {        // if motion is detected
     digitalWrite(ledPin, HIGH); // turn LED on
 
 
@@ -50,13 +45,10 @@ void loop() {
     }
 
 
-    Servo1.write(90);           // Set servo to 90 degrees when motion is detected
-    delay(SERVO_DELAY);         // Wait for 2 seconds
-    Servo1.write(0);            // Return servo to 0 degrees after 2 seconds delay
-    lastSenseTime = millis();   // Update the last sense time
+    Servo1.write(180);           // Set servo to 90 degrees when motion is detected
 
 
-  } else if (pirVal == LOW) {   // if no motion is detected
+  } else {                      // if no motion is detected
     digitalWrite(ledPin, LOW);  // turn LED off
 
 
@@ -66,6 +58,8 @@ void loop() {
       Serial.println(printBuffer);
       lastPirVal = LOW;
     }
-    Servo1.write(0);           // Ensure servo is at 0 degrees when no motion is detected
+
+
+    Servo1.write(0);           // Return servo to 0 degrees when no motion is detected
   }
 }
