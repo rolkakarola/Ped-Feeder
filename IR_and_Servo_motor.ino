@@ -1,17 +1,19 @@
 
-// Combined IR sensor with servo motor, code neeeds to be futher developed
+// Combined IR sensor with servo motor
+// There are two IR sensors one for detecting if bowl is full and the other for detecting if there is a food
+// Servo motor will not move if bowl is full and has a cooldown
 
-#include <Servo.h>
+#include <Servo.h>  
 
-// Pin definitions for IR break beam sensors
-const int sensorPin1 = 2; // IR break beam sensor connected to pin 2
-const int sensorPin2 = 3; // IR break beam sensor connected to pin 3
+// Pin for IR break beam sensors
+const int sensorPin1 = 2; // IR sensor for portion detected
+const int sensorPin2 = 3; // IR sensor for maximum capacity
 
-// Pin definitions for Servo motor, PIR sensor, and LED
+// Pin for Servo motor, PIR sensor, and LED
 Servo Servo1;
-const int servoPin = 10;  // Servo motor pin
-const int ledPin = 8;     // LED pin
-const int pirPin = 7;     // PIR sensor pin
+const int servoPin = 10;              // Servo motor pin
+const int ledPin = LED_BUILTIN;       // LED on Arduino (Built-in)
+const int pirPin = 7;                 // PIR sensor pin
 
 // Variables for PIR sensor
 int lastPirVal = LOW;      // stores the value of the PIR, helps in detecting change
@@ -21,7 +23,11 @@ unsigned long myTime;      // number of milliseconds passed since the Arduino st
 // Constants
 #define MINUTE 60000       // for converting milliseconds to a minute
 #define SECOND 1000        // for converting milliseconds to a second
-char printBuffer[128];     // messages that we want to display on serial monitor
+#define SERVO_DELAY 2000   // Servo delay of 2 seconds
+#define SENSE_COOLDOWN 5000 // Cooldown time of 5 seconds
+
+unsigned long lastSenseTime = -SENSE_COOLDOWN; // Set to allow immediate first activation
+char printBuffer[128];     // Messages that we want to display on serial monitor
 
 void setup() {
   // Setup for IR break beam sensors
@@ -39,40 +45,32 @@ void setup() {
 }
 
 void loop() {
-  // --- IR Break Beam Sensors ---
-  int sensorState1 = digitalRead(sensorPin1);
-  int sensorState2 = digitalRead(sensorPin2);
-
-  if (sensorState1 == LOW) {
-    Serial.println("Portion detected.");
-  }
-
-  if (sensorState2 == LOW) {
-    Serial.println("Maximum capacity! No more allowed!!");
-  }
-
-  if (sensorState1 == HIGH && sensorState2 == HIGH) {
-    Serial.println("No objects detected.");
-  }
-
-  delay(200); // Small delay for IR sensor readability
-
-  // --- PIR Sensor and Servo Motor ---
   pirVal = digitalRead(pirPin); // read current input value from PIR sensor (HIGH or LOW)
+  unsigned long currentTime = millis();
 
-  if (pirVal == HIGH) {        // if motion is detected
+  // Check if motion is detected and cooldown period has passed
+  if (pirVal == HIGH && (currentTime - lastSenseTime >= SENSE_COOLDOWN)) {
     digitalWrite(ledPin, HIGH); // turn LED on
 
-    if (lastPirVal == LOW) {   // if there was no previous motion detected
-      myTime = millis();       // Stores the current time in milliseconds
-      sprintf(printBuffer, "%lu min %lu sec: Motion detected!", myTime / MINUTE, (myTime % MINUTE) / SECOND);
+    if (lastPirVal == LOW) {    // if there was no previous motion detected
+      myTime = millis();        // Stores the current time in milliseconds
+      sprintf(printBuffer, "%lu min %lu sec: =================== Motion detected! =================== ", myTime / MINUTE, (myTime % MINUTE) / SECOND);
       Serial.println(printBuffer);
       lastPirVal = HIGH;
     }
 
-    Servo1.write(180);           // Set servo to 180 degrees when motion is detected
+    // Check sensorState2 before moving the servo (if bowl is full, do not move the servo)
+    int sensorState2 = digitalRead(sensorPin2);
+    if (sensorState2 == HIGH) {  // Only move the servo if sensorState2 is HIGH (bowl not full)
+      Servo1.write(180);         // Set servo to 180 degrees
+      delay(SERVO_DELAY);        // Wait for 2 seconds
+      Servo1.write(0);           // Return servo to 0 degrees after 2 seconds delay
+      lastSenseTime = millis();  // Update the last sense time
+    } else {
+      Serial.println("Sensor2: Maximum capacity! Servo movement prevented.");
+    }
 
-  } else {                      // if no motion is detected
+  } else if (pirVal == LOW) {   // if no motion is detected
     digitalWrite(ledPin, LOW);  // turn LED off
 
     if (lastPirVal == HIGH) {   // if there was motion before
@@ -82,6 +80,6 @@ void loop() {
       lastPirVal = LOW;
     }
 
-    Servo1.write(0);           // Return servo to 0 degrees when no motion is detected
+    Servo1.write(0);           // Ensure servo is at 0 degrees when no motion is detected
   }
 }
